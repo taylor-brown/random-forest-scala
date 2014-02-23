@@ -1,5 +1,7 @@
 package org.taylorbrown.randomforest
 
+import scala.util.Random
+
 case class Label(label: Int)
 
 case class Split(attr: Int, split: Float, measure: Float)
@@ -11,12 +13,14 @@ case class Example(ex: Seq[Float], label: Label)
 trait TreeLearner {
   def chooseAttr(attr: Seq[Example]): Split
 
-  def fit(ex: Seq[Example]): Node = {
+  def fit(ex: Seq[Example], depthLeft:Int = 100): Node = {
     if (ex.length < 1) return Leaf() //shouldn't happen?
-    if (ex.map(_.label).toSet.size == 1) return Leaf(ex.head.label)
+    if (ex.map(_.label).toSet.size == 1) return Leaf(ex.head.label) // all same label
+//    if (ex.takeWhile(_.ex.equals(ex.head.ex)).length == ex.length) return Leaf(ex.map(_.label).groupBy(l=>l).maxBy(_._2.length)._1) // all same values
+    if(depthLeft < 1) return Leaf(ex.map(_.label).groupBy(l=>l).maxBy(_._2.length)._1) // return max class
     val inx = chooseAttr(ex)
     val (lc, rc) = ex.partition(ex => ex.ex(inx.attr) <= inx.split)
-    TreeNode(inx, fit(lc), fit(rc))
+    TreeNode(inx, fit(lc, depthLeft-1), fit(rc, depthLeft -1 ))
   }
 
   def classify(ex: Example, tree: Node): Label = {
@@ -29,42 +33,23 @@ trait TreeLearner {
   }
 }
 
-case class GiniHelper(gini: Float, labelCounts: Map[Label, Int], split: Split)
-
-class GiniLearner extends TreeLearner {
+abstract class BaseGiniLearner extends TreeLearner {
   def sq(x: Float) = x * x
   def chooseAttr(attr: Seq[Example]): Split = {
-    val ginis = for (i <- 0 to attr.head.ex.length-1) yield {
-
+    val ginis = for (i <- getAttributes(attr)) yield {
+      //todo - distinct value calcs
       attr.foldLeft(Split(i, attr.head.ex(i), 1)){case (curSplit, e) =>
         val newgini = giniSplit(Split(i, e.ex(i), 1), attr, i)
         if(newgini < curSplit.measure){
           Split(i, e.ex(i), newgini)//todo - split between values
         }else curSplit
       }
-//      vals.view.zipWithIndex.foldLeft(GiniHelper(1, Map[Label, Int](), Split(i, attrs.last.ex(i)))) ({
-//        case (gini: GiniHelper, (ex: Example, index)) => {
-//          val (newmap, newgini) = calculateGinis(attrs, gini, ex)
-//          if (newgini < gini.gini) GiniHelper(newgini, newmap, Split(i, ex.ex(i))) else GiniHelper(gini.gini, newmap, gini.split)
-//        }
-//      })
     }
     ginis.minBy(f => f.measure)
   }
-  
-//  def calculateGinis(attrs: Seq[org.taylorbrown.randomforest.Example], gini: GiniHelper, ex: org.taylorbrown.randomforest.Example): (scala.collection.immutable.Map[org.taylorbrown.randomforest.Label,Int], Int) = {
-//    val newmap = gini.labelCounts + (ex.label -> (gini.labelCounts.getOrElse(ex.label, 0) + 1))
-//    val newgini = (for (label <- newmap.keys) yield {
-//      val ltfreqs = for (cl <- newmap.keys) yield {
-//        attrs.length - newmap(cl)
-//      }
-//      val gtfreqs = for (cl <- newmap.keys) yield {
-//        newmap(cl)
-//      }
-//      newmap(label) / attrs.length * (1 - sq(ltfreqs.map(_ / newmap(label)).sum) + sq(gtfreqs.map(_ / newmap(label)).sum))
-//    }).sum
-//    (newmap, newgini)
-//  }
+
+
+  def getAttributes(attr: Seq[Example]):Seq[Int]
 
   def giniSplit(split:Split, attrs:Seq[Example], attr:Int)= {
     val totalCount = attrs.length
@@ -80,5 +65,19 @@ class GiniLearner extends TreeLearner {
   def calculateGini(labelCounts:Map[Label,Int], totalCount:Int) = {
     1 - labelCounts.map{case (k,v) => sq(v.toFloat/totalCount)}.sum
   }
-
 }
+
+class GiniLearner extends BaseGiniLearner {
+  def getAttributes(attr: Seq[Example]) = {
+    0 to attr.head.ex.length - 1
+  }
+}
+
+  class RandomGiniLearner extends BaseGiniLearner {
+    def getAttributes(attr: Seq[Example]) = {
+      val num = math.max(math.sqrt(attr.head.ex.length), 1).toInt // use sqrt of number of attributes
+      Random.shuffle((0 to (attr.head.ex.length -1)).toList).take(num)
+    }
+
+  }
+
