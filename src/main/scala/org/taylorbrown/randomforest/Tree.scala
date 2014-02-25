@@ -13,7 +13,7 @@ case class Example(ex: Seq[Float], label: Label)
 trait TreeLearner {
   def chooseAttr(attr: Seq[Example]): Split
 
-  def fit(ex: Seq[Example], depthLeft:Int = 100): Node = {
+  def fit(ex: Seq[Example], depthLeft:Int = 15): Node = {
     if (ex.length < 1) return Leaf() //shouldn't happen?
     if (ex.map(_.label).toSet.size == 1) return Leaf(ex.head.label) // all same label
 //    if (ex.takeWhile(_.ex.equals(ex.head.ex)).length == ex.length) return Leaf(ex.map(_.label).groupBy(l=>l).maxBy(_._2.length)._1) // all same values

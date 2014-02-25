@@ -13,7 +13,7 @@ class Forest( exs:Seq[Example], nTrees:Int = 500, treeLearner:TreeLearner = new 
     seq(rand.nextInt(seq.length-1))
   } // generic?
   def fit(exs:Seq[Example]) = {
-    for(t <- 0 to nTrees) yield{
+    (0 to nTrees).par.map{ t=>
       treeLearner.fit(sample(exs))
     }
   }
